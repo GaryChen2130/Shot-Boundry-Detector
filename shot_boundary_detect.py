@@ -5,10 +5,14 @@ import math
 import matplotlib.pyplot as plt
 
 BIN_SIZE = 8
-THRESHOLD = 7000
-#VIDEO_PATH = '.\\ironman.mpg'
+THRESHOLD = 6000
+VIDEO_PATH = '.\\ironman.mpg'
 #VIDEO_PATH = '.\\news.mpg'
-VIDEO_PATH = '.\\baseball.mpg'
+#VIDEO_PATH = '.\\baseball.mpg'
+ZEROBOUND = 150
+LOWERBOUND = 250
+HARDCUT_CHECK = 5
+DISSOLVE_CHECK = 9
 
 def read_video(path):
 	frames = []
@@ -50,6 +54,8 @@ def compute_dis(hist1,hist2):
 
 def detect_shots(video,cd):
 	frame_num = 0
+	dissolve_sum = 0
+	dissolve_cnt = 0
 	boundary = []
 	dis_list = []
 	for frame in video:
@@ -64,12 +70,27 @@ def detect_shots(video,cd):
 		dis = compute_dis(hist_prev,hist)
 		dis_list.append(dis)
 
-		if dis > THRESHOLD:
-			print('frame number: ' + str(frame_num - 1) + ', distance: ' + str(dis))
+		if (dis > THRESHOLD) and (dissolve_cnt <= HARDCUT_CHECK):
+			print('Hard Cut! frame number: ' + str(frame_num - 1) + ', distance: ' + str(dis))
 			if (len(boundary) == 0) or (frame_num - boundary[-1][0] > cd):
 				boundary.append((frame_num - 1,dis))
 			elif dis > boundary[-1][1]:
 				boundary[-1] = (frame_num - 1,dis)
+		
+		elif dis > LOWERBOUND:
+			dissolve_sum += dis
+			dissolve_cnt += 1
+			#print('frame number: ' + str(frame_num - 1) + ', distance: ' + str(dis))
+
+		elif dis < ZEROBOUND:
+			if dissolve_cnt >= DISSOLVE_CHECK:
+				print('Dissolve! frame number: ' + str(frame_num - 2) + ', distance: ' + str(dissolve_sum) + ', count: ' + str(dissolve_cnt))
+				if (len(boundary) == 0) or (frame_num - boundary[-1][0] - 1 > cd):
+					boundary.append((frame_num - 2,dissolve_sum))
+				elif dissolve_sum > boundary[-1][1]:
+					boundary[-1] = (frame_num - 2,dissolve_sum)
+			dissolve_sum = 0
+			dissolve_cnt = 0
 
 		hist_prev = copy.deepcopy(hist)
 
